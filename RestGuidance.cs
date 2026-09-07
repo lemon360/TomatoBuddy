@@ -2,7 +2,7 @@ namespace TomatoBuddy;
 public record GuidanceStep(string Title, string Instruction, string Note);
 public static class RestGuidance
 {
- public static readonly string[] Scenes = ["Plant", "Dance", "Eyes", "Move", "Calm"];
+ public static readonly string[] Scenes = ["Plant", "Dance", "Eyes", "Move", "Calm", "None"];
  public static string Normalize(string? scene) => Scenes.Contains(scene) ? scene! : "Plant";
  public static bool IsGuided(string scene) => scene is "Eyes" or "Move" or "Calm";
  public static GuidanceStep Get(string scene, double elapsedSeconds)

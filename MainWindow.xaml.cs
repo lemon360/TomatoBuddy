@@ -92,14 +92,13 @@ public partial class MainWindow : Window
    restTransition = true;
    var id = reward.Complete();
    if (id.HasValue) { data.Harvests.Add(new RestHarvest(id.Value, DateTimeOffset.Now, duration.TotalMinutes, data.Settings.RestScene)); Persist(); RefreshStats(); }
-   overlay.Celebrate();
-   await System.Threading.Tasks.Task.Delay(1800);
+   if (data.Settings.RestScene != "None") { overlay.Celebrate(); await System.Threading.Tasks.Task.Delay(1800); }
    overlay.Dispose(); overlay = null; restTransition = false;
   }
   if (data.Settings.Sound) System.Media.SystemSounds.Asterisk.Play();
   CloseRest(); var next = timer.Next(phase, data.Settings.Interval); timer.Select(next, Duration(next));
   tray.ShowBalloonTip(4000, phase == Phase.Focus ? "又收获一颗番茄！" : "休息结束，欢迎回来", phase == Phase.Focus ? "看看远处，眨眨眼，让眼睛放松一下。" : "准备好了，就开始下一段专注吧。", Forms.ToolTipIcon.Info);
-  if (phase == Phase.Focus && (data.Settings.AutoBreak || data.Settings.StrictRest) || phase != Phase.Focus && data.Settings.AutoFocus) { activeTask = TaskInput.Text.Trim(); timer.Start(DateTimeOffset.UtcNow); }
+  if (data.Settings.AutoStartAfter(phase)) { activeTask = TaskInput.Text.Trim(); timer.Start(DateTimeOffset.UtcNow); }
   if (phase == Phase.Focus && data.Settings.StrictRest) OpenStrictRest();
   else if (phase == Phase.Focus && data.Settings.BreakWindow) OpenRest();
  }

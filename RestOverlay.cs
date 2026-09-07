@@ -111,13 +111,14 @@ internal sealed class RestScreen : Window
   var transforms = new TransformGroup(); transforms.Children.Add(grow); transforms.Children.Add(sway); transforms.Children.Add(bounce); actor.RenderTransform = transforms; stage.Children.Add(actor);
   fruit = new System.Windows.Controls.Image { Source = Asset("icon.png"), Width = 83, Height = 83, HorizontalAlignment = System.Windows.HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(235, 116, 0, 0), RenderTransformOrigin = new System.Windows.Point(.5, 0), RenderTransform = fruitScale, Visibility = scene == "Plant" ? Visibility.Visible : Visibility.Collapsed };
   stage.Children.Add(fruit); stack.Children.Add(stage);
+  if (scene == "None") { stage.Visibility = Visibility.Collapsed; countdown.Margin = new Thickness(0, 42, 0, 25); }
   guidanceNote.FontSize = 13; guidanceNote.Foreground = B("#9D8A71"); guidanceNote.TextAlignment = TextAlignment.Center; guidanceNote.TextWrapping = TextWrapping.Wrap; guidanceNote.Margin = new Thickness(20, 8, 20, 10); stack.Children.Add(guidanceNote);
   countdown.FontSize = 48; countdown.FontFamily = new System.Windows.Media.FontFamily("Segoe UI"); countdown.FontWeight = FontWeights.SemiBold; countdown.HorizontalAlignment = System.Windows.HorizontalAlignment.Center; stack.Children.Add(countdown);
   caption.TextWrapping = TextWrapping.Wrap; caption.TextAlignment = TextAlignment.Center; caption.MaxWidth = 700; caption.FontSize = 15; caption.Foreground = B("#9D8A71"); caption.HorizontalAlignment = System.Windows.HorizontalAlignment.Center; caption.Margin = new Thickness(0, 12, 0, 20); stack.Children.Add(caption);
   var track = new Border { Width = 300, Height = 6, Background = B("#E8DDCA"), CornerRadius = new CornerRadius(3) }; bar.Background = B("#E87760"); bar.CornerRadius = new CornerRadius(3); bar.HorizontalAlignment = System.Windows.HorizontalAlignment.Left; track.Child = bar; stack.Children.Add(track);
   stack.Children.Add(Label("离开屏幕，看看远处。倒计时结束后会自动返回。", 13, "#9D8A71"));
   root.Children.Add(new TextBlock { Text = preview ? "预览会自动结束" : "紧急退出：Ctrl + Alt + Shift + F12（本轮不结果）", Foreground = B("#B0A28F"), FontSize = 11, HorizontalAlignment = System.Windows.HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 20) });
-  Opacity = 0; Loaded += (_, _) => BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(600)));
+  if (scene != "None") { Opacity = 0; Loaded += (_, _) => BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(600))); }
   Closing += (_, e) => { if (!released) e.Cancel = true; };
   PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape || e.Key == Key.System) e.Handled = true; };
  }
@@ -129,6 +130,7 @@ internal sealed class RestScreen : Window
  public void Render(double p, string time, double seconds, bool complete)
  {
   countdown.Text = time; bar.Width = 300 * p;
+  if (scene == "None") { heading.Text = "休息一下"; caption.Text = "让眼睛和身体歇一会儿，结束后自动返回。"; guidanceNote.Text = ""; return; }
   sway.Angle = Math.Sin(seconds * (scene == "Dance" ? 3.3 : 1.2)) * (scene == "Dance" ? 12 : 1.6);
   bounce.Y = scene == "Dance" ? -Math.Abs(Math.Sin(seconds * 3.3)) * 25 : 0;
   grow.ScaleX = scene == "Dance" ? 1 + Math.Sin(seconds * 6.6) * .035 : .78 + .22 * p; grow.ScaleY = scene == "Dance" ? 1 - Math.Sin(seconds * 6.6) * .035 : .78 + .22 * p;

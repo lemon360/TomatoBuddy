@@ -36,3 +36,18 @@ Check(RestGuidance.Get("Eyes", 35).Title.Contains("Õ£"), "eye sequence advances 
 Check(RestGuidance.Get("Move", 50).Title == RestGuidance.Get("Move", 900).Title, "movement ends in quiet rest without endless exercise");
 Check(RestGuidance.Get("Calm", 20).Instruction.Contains("²»ÓÃÆÁÏ¢"), "calm does not require breath holding");
 Console.WriteLine($"Total: {checks} checks passed");
+
+Check(new Preferences().AutoFocus && new Preferences().AutoBreak, "new installs continuously cycle by default");
+var oldSettings = new AppData { Settings = new Preferences { AutoFocus = false, AutoBreak = false } };
+LocalStore.UpgradeContinuity(oldSettings);
+Check(oldSettings.Settings.AutoFocus && oldSettings.Settings.AutoBreak, "existing installations migrate to continuous defaults");
+oldSettings.Settings.AutoFocus = false; LocalStore.UpgradeContinuity(oldSettings);
+Check(!oldSettings.Settings.AutoFocus, "subsequent user opt-out is preserved");
+Check(RestGuidance.Normalize("None") == "None" && !RestGuidance.IsGuided("None"), "no transition is a persistent valid scene");
+var continuous = new TimerEngine(); var preferences = new Preferences(); var tickTime = now; int cycles = 0;
+continuous.Select(Phase.Focus, TimeSpan.FromSeconds(1));
+continuous.Finished += (phase, duration) => { cycles++; var next = continuous.Next(phase, 4); continuous.Select(next, TimeSpan.FromSeconds(1)); if (preferences.AutoStartAfter(phase)) continuous.Start(tickTime); };
+continuous.Start(tickTime);
+for(int i = 0; i < 8; i++) { tickTime = tickTime.AddSeconds(1); continuous.Tick(tickTime); }
+Check(cycles == 8 && continuous.Running && continuous.Phase == Phase.Focus && continuous.Completed == 4, "four focus-break rounds run continuously including long break");
+Console.WriteLine($"Total: {checks} checks passed");
