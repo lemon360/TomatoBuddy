@@ -14,7 +14,9 @@ public class Preferences
  public bool StrictRest { get; set; } = true;
  public string RestScene { get; set; } = "Plant";
  public string Task { get; set; } = "";
- public bool AutoStartAfter(Phase finished) => finished == Phase.Focus ? AutoBreak || StrictRest : AutoFocus;
+ [System.Text.Json.Serialization.JsonIgnore]
+ public bool EffectiveStrictRest => StrictRest && RestScene != "None";
+ public bool AutoStartAfter(Phase finished) => finished == Phase.Focus ? AutoBreak || EffectiveStrictRest : AutoFocus;
 }
 public record Session(DateTimeOffset FinishedAt, double Minutes, string Task);
 public record RestHarvest(Guid Id, DateTimeOffset FinishedAt, double Minutes, string Scene);

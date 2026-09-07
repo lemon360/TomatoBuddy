@@ -60,7 +60,14 @@ public partial class MainWindow : Window
  private void ShowSettings(object sender, RoutedEventArgs e)
  {
   var s = data.Settings; FocusInput.Text = s.Focus.ToString(); ShortInput.Text = s.ShortBreak.ToString(); LongInput.Text = s.LongBreak.ToString(); IntervalInput.Text = s.Interval.ToString();
-  SoundInput.IsChecked = s.Sound; AutoBreakInput.IsChecked = s.AutoBreak; AutoFocusInput.IsChecked = s.AutoFocus; BreakWindowInput.IsChecked = s.BreakWindow; StrictRestInput.IsChecked = s.StrictRest; SceneInput.SelectedIndex = Array.IndexOf(RestGuidance.Scenes, RestGuidance.Normalize(s.RestScene)); SettingsMessage.Text = ""; Page(SettingsPage);
+  SoundInput.IsChecked = s.Sound; AutoBreakInput.IsChecked = s.AutoBreak; AutoFocusInput.IsChecked = s.AutoFocus; BreakWindowInput.IsChecked = s.BreakWindow; StrictRestInput.IsChecked = s.StrictRest; SceneInput.SelectedIndex = Array.IndexOf(RestGuidance.Scenes, RestGuidance.Normalize(s.RestScene)); SceneChanged(this, null!); SettingsMessage.Text = ""; Page(SettingsPage);
+ }
+ private void SceneChanged(object sender, SelectionChangedEventArgs e)
+ {
+  bool none = SceneInput.SelectedIndex == Array.IndexOf(RestGuidance.Scenes, "None");
+  StrictRestInput.IsEnabled = !none;
+  StrictRestInput.IsChecked = none ? false : data.Settings.StrictRest;
+  StrictRestInput.ToolTip = none ? "选择无时，不会强制全屏或拦截快捷键。" : null;
  }
  private void Page(UIElement target) { FocusPage.Visibility = StatsPage.Visibility = SettingsPage.Visibility = Visibility.Collapsed; target.Visibility = Visibility.Visible; }
  private void SelectPhase(object sender, RoutedEventArgs e)
@@ -74,7 +81,7 @@ public partial class MainWindow : Window
  {
   if (RestLocked) return;
   if (timer.Running) timer.Pause(DateTimeOffset.UtcNow);
-  else { if (timer.Phase == Phase.Focus && timer.Remaining == timer.Duration) activeTask = TaskInput.Text.Trim(); timer.Start(DateTimeOffset.UtcNow); if (timer.Phase != Phase.Focus && data.Settings.StrictRest) OpenStrictRest(); }
+  else { if (timer.Phase == Phase.Focus && timer.Remaining == timer.Duration) activeTask = TaskInput.Text.Trim(); timer.Start(DateTimeOffset.UtcNow); if (timer.Phase != Phase.Focus && data.Settings.EffectiveStrictRest) OpenStrictRest(); }
   RefreshTimer();
  }
  private void ResetTimer(object sender, RoutedEventArgs e)
@@ -99,7 +106,7 @@ public partial class MainWindow : Window
   CloseRest(); var next = timer.Next(phase, data.Settings.Interval); timer.Select(next, Duration(next));
   tray.ShowBalloonTip(4000, phase == Phase.Focus ? "又收获一颗番茄！" : "休息结束，欢迎回来", phase == Phase.Focus ? "看看远处，眨眨眼，让眼睛放松一下。" : "准备好了，就开始下一段专注吧。", Forms.ToolTipIcon.Info);
   if (data.Settings.AutoStartAfter(phase)) { activeTask = TaskInput.Text.Trim(); timer.Start(DateTimeOffset.UtcNow); }
-  if (phase == Phase.Focus && data.Settings.StrictRest) OpenStrictRest();
+  if (phase == Phase.Focus && data.Settings.EffectiveStrictRest) OpenStrictRest();
   else if (phase == Phase.Focus && data.Settings.BreakWindow) OpenRest();
  }
  private void RefreshTimer()
@@ -140,13 +147,13 @@ public partial class MainWindow : Window
  {
   if (RestLocked) return;
   if (!int.TryParse(FocusInput.Text, out int f) || f < 1 || f > 180 || !int.TryParse(ShortInput.Text, out int s) || s < 1 || s > 60 || !int.TryParse(LongInput.Text, out int l) || l < 1 || l > 120 || !int.TryParse(IntervalInput.Text, out int i) || i < 2 || i > 12) { SettingsMessage.Text = "请输入整数：专注 1–180，短休息 1–60，长休息 1–120，轮数 2–12。"; return; }
-  var p = data.Settings; p.Focus = f; p.ShortBreak = s; p.LongBreak = l; p.Interval = i; p.Sound = SoundInput.IsChecked == true; p.AutoBreak = AutoBreakInput.IsChecked == true; p.AutoFocus = AutoFocusInput.IsChecked == true; p.BreakWindow = BreakWindowInput.IsChecked == true; p.StrictRest = StrictRestInput.IsChecked == true; p.RestScene = RestGuidance.Scenes[Math.Clamp(SceneInput.SelectedIndex, 0, RestGuidance.Scenes.Length - 1)];
+  var p = data.Settings; p.Focus = f; p.ShortBreak = s; p.LongBreak = l; p.Interval = i; p.Sound = SoundInput.IsChecked == true; p.AutoBreak = AutoBreakInput.IsChecked == true; p.AutoFocus = AutoFocusInput.IsChecked == true; p.BreakWindow = BreakWindowInput.IsChecked == true; if (SceneInput.SelectedIndex != Array.IndexOf(RestGuidance.Scenes, "None")) p.StrictRest = StrictRestInput.IsChecked == true; p.RestScene = RestGuidance.Scenes[Math.Clamp(SceneInput.SelectedIndex, 0, RestGuidance.Scenes.Length - 1)];
   if (!timer.Running && timer.Remaining == timer.Duration) timer.Select(timer.Phase, Duration(timer.Phase));
   SettingsMessage.Text = store.Save(data) ? "已保存。按照自己的节奏，慢慢来。" : store.Warning; RefreshTimer();
  }
  private void OpenStrictRest()
  {
-  if (overlay != null) return;
+  if (overlay != null || !data.Settings.EffectiveStrictRest) return;
   try { reward.Begin(false); overlay = new RestOverlay(data.Settings.RestScene, false, EmergencyRest); }
   catch (Exception ex) { reward.Abort(); timer.Pause(DateTimeOffset.UtcNow); StatusLabel.Text = "强制休息启动失败：" + ex.Message; Restore(); }
  }
@@ -161,6 +168,7 @@ public partial class MainWindow : Window
  private async void PreviewRest(object sender, RoutedEventArgs e)
  {
   if (RestLocked || timer.Running) { SettingsMessage.Text = "请先暂停当前计时，再预览动画。"; return; }
+  if (RestGuidance.Scenes[Math.Clamp(SceneInput.SelectedIndex, 0, RestGuidance.Scenes.Length - 1)] == "None") { OpenRest(); return; }
   restTransition = true;
   RestOverlay? previewWindow = null;
   try
@@ -174,12 +182,13 @@ public partial class MainWindow : Window
  }
  private void OpenRest()
  {
-  restWindow = new Window { Title = "番茄小伴 · 休息一下", Width = 490, Height = 490, ResizeMode = ResizeMode.NoResize, WindowStartupLocation = WindowStartupLocation.CenterScreen, Background = Brush("#FBF7F1"), Topmost = true, FontFamily = FontFamily };
+  CloseRest();
+  restWindow = new Window { Title = "番茄小伴 · 休息一下", Width = 490, Height = 490, ResizeMode = ResizeMode.NoResize, WindowStartupLocation = WindowStartupLocation.CenterScreen, Background = Brush("#FBF7F1"), Topmost = false, FontFamily = FontFamily };
   var stack = new StackPanel { Margin = new Thickness(30) }; if (HeroImage.Source != null) stack.Children.Add(new System.Windows.Controls.Image { Source = HeroImage.Source, Height = 185, Stretch = Stretch.UniformToFill });
   stack.Children.Add(new TextBlock { Text = "辛苦啦，让眼睛透透气。", FontSize = 23, FontWeight = FontWeights.Bold, HorizontalAlignment = System.Windows.HorizontalAlignment.Center, Margin = new Thickness(0, 18, 0, 10) });
   stack.Children.Add(new TextBlock { Text = "望望远处，眨眨眼，再轻轻伸个懒腰。", HorizontalAlignment = System.Windows.HorizontalAlignment.Center, Foreground = Brush("#9A8A7D") });
   restTime = new TextBlock { FontSize = 30, HorizontalAlignment = System.Windows.HorizontalAlignment.Center, Margin = new Thickness(0, 13, 0, 13) }; stack.Children.Add(restTime);
-  var close = new System.Windows.Controls.Button { Content = timer.Running ? "收起提醒，继续休息" : "开始休息" }; close.Click += (_, _) => { if (!timer.Running) timer.Start(DateTimeOffset.UtcNow); CloseRest(); }; stack.Children.Add(close);
+  var close = new System.Windows.Controls.Button { Content = "关闭提醒（不影响计时）" }; close.Click += (_, _) => CloseRest(); stack.Children.Add(close);
   restWindow.Content = stack; restWindow.Closed += (_, _) => { restWindow = null; restTime = null; }; RefreshTimer(); restWindow.Show();
  }
  private void CloseRest() { restWindow?.Close(); restWindow = null; restTime = null; }
