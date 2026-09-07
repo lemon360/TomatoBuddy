@@ -1,0 +1,30 @@
+name: Windows build
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Test
+        run: dotnet run --project Tests/Tests.csproj -c Release
+      - name: Publish portable app
+        run: dotnet publish TomatoBuddy.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o release/portable
+      - name: Include documentation
+        shell: pwsh
+        run: |
+          Copy-Item README.md,LICENSE,NOTICE.md release/portable/
+          Get-ChildItem release/portable -Filter *.pdb | Remove-Item
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TomatoBuddy-Windows11-x64
+          path: release/portable/
